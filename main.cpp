@@ -1,6 +1,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
+#include <unordered_map>
 
 std::string input_buffer = {
   "let five = 5;\n"
@@ -20,6 +21,7 @@ enum token_type {
   INT,
   ASSIGN,
   PLUS,
+  MINUS,
   COMMA,
   SEMICOLON,
   LPAREN,
@@ -28,72 +30,160 @@ enum token_type {
   RBRACE,
   FUNCTION,
   LET,
-  END_FILE
+  END_FILE,
+  SLASH,
+  ASTERISK,
+  BANG,
+  LT,
+  GT,
+  TRUE,
+  FALSE,
+  IF,
+  ELSE,
+  RETURN,
+  EQ,
+  NOT_EQ
 };
 
 struct token {
   token_type type;
-  char data;
+  std::string data;
 };
+
+
+
 
 struct Lexer {
-  std::fstream file;
-  char ch;
   std::vector<token> tokens;
-  void read_char();
+  std::fstream file;
 
-  Lexer(const std::string& filename);
+  std::unordered_map<std::string, token_type> keywords = {
+    {"fn", FUNCTION},
+    {"let", LET},
+    {"true", TRUE},
+    {"false", FALSE},
+    {"if", IF},
+    {"else", ELSE},
+    {"return", RETURN}
+  };
+  
+  void gen_tokens(const std::string& line);
+  void read_in();
+  
+  explicit Lexer(const std::string& filename);
 };
 
-Lexer::Lexer(const std::string& filename){
-  file.open(filename,std::fstream::in);
-  ch = -1;
-};
+Lexer::Lexer(const std::string& filename): file(filename) {}
 
-void Lexer::read_char(){
-  while(file >> ch){
-    token tok;
+void Lexer::gen_tokens(const std::string& line){
+  
+
+  auto is_ident = [&](char letter){
+    return ('a' <= letter && letter <= 'z') || ('A' <= letter && letter <= 'Z');
+  };
+
+  auto is_num = [&](char letter){
+    return ('0' <= letter) && (letter <= '9');
+  };
+
+  
     
-    switch(ch) {
+  
+  for(size_t i = 0; i < line.size(); i++){
+    token tok;
+
+
+    switch(line[i]) {
     case '=':
-      tok.type = ASSIGN;
-      break;
-    case ';':
-      tok.type = SEMICOLON;
-      break;
-    case '(':
-      tok.type = LPAREN;
-      break;
-    case ')':
-      tok.type = RPAREN;
-      break;
-    case ',':
-      tok.type = COMMA;
-      break;
-    case '+':
-      tok.type = PLUS;
-      break;
-    case '{':
-      tok.type = LBRACE;
-      break;
-    case '}':
-      tok.type = RBRACE;
-      break;
-    default:
-      if (isalpha(ch)){
-	tok.type = IDENT;
-	//do something smart
-	std::cout << tok.data << "\n";
-	//read_char();
+      if(line[i+1] == '='){
+	tok.type = EQ;
+	tok.data = line[i];
+	tok.data += line[i+1];
+	i++;
+	tokens.push_back(tok);
 	break;
+      } else {
+	tok.type = ASSIGN; goto DEFAULT;}
+
+       
+    case ';': tok.type = SEMICOLON; goto DEFAULT;
+      
+    case '(': tok.type = LPAREN; goto DEFAULT;
+      
+    case ')': tok.type = RPAREN; goto DEFAULT;
+      
+    case ',': tok.type = COMMA; goto DEFAULT;
+      
+    case '{': tok.type = LBRACE; goto DEFAULT;
+      
+    case '}': tok.type = RBRACE; goto DEFAULT;
+      
+    case '+': tok.type = PLUS; goto DEFAULT;
+      
+    case '-': tok.type = MINUS; goto DEFAULT;
+      
+    case '!':
+      if(line[i+1] == '='){
+	tok.type = NOT_EQ;
+	tok.data = line[i];
+	tok.data += line[i+1];
+	tokens.push_back(tok);	
+	i++;
+	
       }
+      tok.type = BANG;
+
+      
+    case '*': tok.type = ASTERISK; goto DEFAULT;
+      
+    case '/': tok.type = SLASH; goto DEFAULT;
+      
+    case '<': tok.type = LT; goto DEFAULT;
+      
+    case '>': tok.type = GT; goto DEFAULT;
+       
+    case ' ': break;
+    DEFAULT:
+    default:
+
+      tok.data = line[i];
+	  
+      if(is_ident(line[i])){
+
+	  tok.type = IDENT;
+
+	  i++;
+	  for( ; is_ident(line[i]); i++){
+	    tok.data += line[i];
+	  }
+
+	  if(keywords[tok.data]){
+	    tok.type = keywords[tok.data];
+	  };
+	  
+
+      }
+
+      if(is_num(line[i])){
+	tok.type = INT;
+      }
+      tokens.push_back(tok);
     }
 
-    tok.data = ch;
-
-    tokens.push_back(tok);
+    
   }
 }
+
+void Lexer::read_in(){
+  std::string line;
+  while(std::getline(file,line)){
+    gen_tokens(line);
+  };
+
+}
+
+
+
 
 
 std::ostream& operator<<(std::ostream& out, const token_type& val){
@@ -114,41 +204,39 @@ std::ostream& operator<<(std::ostream& out, const token_type& val){
     STR(FUNCTION);
     STR(LET);
     STR(END_FILE);
+    STR(MINUS);
+    STR(BANG);
+    STR(ASTERISK);
+    STR(SLASH);
+    STR(LT);
+    STR(GT);
+    STR(TRUE);
+    STR(FALSE);
+    STR(IF);
+    STR(ELSE);
+    STR(RETURN);
+    STR(EQ);
+    STR(NOT_EQ);
   }
 #undef STR
 
   return out << s;
 }
 
-int main(){
-  //std::cout << input_buffer;
 
-
-  
-  Lexer lexer("test.ml");
-  lexer.read_char();
-  
-
-
-  for(const auto &i: lexer.tokens){
-    std::cout << i.data << " -- " << i.type << "\n";
-  };
-
-
-
-
-
-  return 1;
-  
-  char ch;
-  std::fstream file("simp.ml",std::fstream::in);
-
+std::vector<token> tokenify(const std::string& line){
   std::vector<token> tokens;
-  
-  while(file >> ch){
-    token tok;
 
-    switch(ch) {
+  auto is_ident = [&](char letter){
+    return ('a' <= letter && letter <= 'z') || ('A' <= letter && letter <= 'Z');
+  };
+    
+  
+  for(size_t i = 0; i < line.size(); i++){
+    token tok;
+    std::cout << "work\n";
+
+    switch(line[i]) {
     case '=':
       tok.type = ASSIGN;
       break;
@@ -173,20 +261,76 @@ int main(){
     case '}':
       tok.type = RBRACE;
       break;
+    case ' ':
+      goto QUIT;
     default:
-      if (isalpha(ch)){
-	tok.type = IDENT;
-	//do something smart
+      if(is_ident(line[i])){
+	  tok.data = line[i];
+	  tok.type = IDENT;
+	  /*
+	  while(true){
+	    i++;
+	    if(is_ident(line[i])){
+	      tok.data += line[i];
+	    } else {
+	      break; }
+	  }
+	  */
+	  i++;
+	  for( ; is_ident(line[i]); i++){
+	    tok.data += line[i];
+	  }
+
+	  if(tok.data == "fn"){
+	    tok.type = FUNCTION;
+	  } else if (tok.data == "let"){
+	    tok.type = LET;
+	  }
+	  
+	  tokens.push_back(tok);
+	  goto QUIT;
       }
     }
-
-    tok.data = ch;
+        
+	
+    
+	    
+    tok.data = line[i];
 
     tokens.push_back(tok);
-  };
 
-  for(const auto &i: tokens){
-    std::cout << i.data << " -- " << i.type << "\n";
-  };
+  QUIT:continue;
+    
+  }
+
+  return tokens;
+}
+
+  
+
+int main(int argc, char**argv){
+ 
+
+  
+  /*  
+  std::fstream file("test.ml",std::fstream::in);
+  std::string line;
+  std::vector<std::vector<token>> tokens;
+
+  
+
+  while(std::getline(file,line)){
+    tokens.push_back(tokenify(line));
+  }
+  */
+
+  Lexer lexer("test2.ml");
+
+  lexer.read_in();
+ 
+  for(const auto &j: lexer.tokens){
+      std::cout << j.data << " -- " << j.type << "!\n";
+  }
+ 
   return 0;
 }
