@@ -94,7 +94,8 @@ struct Lexer {
   
   void gen_tokens(const std::string& line);
   void read_in();
-  
+
+  Lexer() {}
   explicit Lexer(const std::string& filename) : file(filename) {}
 };
 
@@ -109,9 +110,7 @@ void Lexer::gen_tokens(const std::string& line){
     return ('0' <= letter) && (letter <= '9');
   };
 
-  
     
-  
   for(size_t i = 0; i < line.size(); i++){
     token tok;
 
