@@ -1,5 +1,6 @@
 #pragma once
 
+#include <assert.h>
 #include <iostream>
 #include <fstream>
 #include <unordered_map>
@@ -110,6 +111,8 @@ void Lexer::gen_tokens(const std::string& line){
     return ('0' <= letter) && (letter <= '9');
   };
 
+
+
     
   for(size_t i = 0; i < line.size(); i++){
     token tok;
@@ -151,9 +154,9 @@ void Lexer::gen_tokens(const std::string& line){
 	tok.data += line[i+1];
 	tokens.push_back(tok);	
 	i++;
-	
-      }
-      tok.type = BANG;
+	break;
+      } else {
+	tok.type = BANG; goto DEFAULT;}
 
       
     case '*': tok.type = ASTERISK; goto DEFAULT;
@@ -167,32 +170,37 @@ void Lexer::gen_tokens(const std::string& line){
     case ' ': break;
     DEFAULT:
     default:
-
       tok.data = line[i];
 	  
       if(is_ident(line[i])){
-
-	  tok.type = IDENT;
-
-	  i++;
-	  for( ; is_ident(line[i]); i++){
-	    tok.data += line[i];
+	
+	  for( ; ; ){	    
+	    if(is_ident(line[i+1])){
+	      tok.data += line[++i];
+	    } else { break; }
 	  }
 
 	  if(keywords[tok.data]){
 	    tok.type = keywords[tok.data];
-	  };
+	  } else {
+	    tok.type = IDENT;
+	  }
 	  
-
       }
 
       if(is_num(line[i])){
 	tok.type = INT;
+	  for(;;){	    
+	    if(is_num(line[i+1])){
+	      tok.data += line[++i];
+	    } else { break; }
+	   
+	  }
+	  
       }
+      
       tokens.push_back(tok);
     }
-
-    
   }
 }
 

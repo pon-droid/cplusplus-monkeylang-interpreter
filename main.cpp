@@ -33,15 +33,9 @@ public:
 
 int main(int argc, char**argv){
  
-
+  assert(argv[1] != NULL);
   Lexer lexer(argv[1]);
   lexer.read_in();
-
-  for(const auto &i: lexer.tokens){
-    std::cout << i.data << " | " << i.type << "\n";
-  }
-  return 0;
-  
 
   std::vector<LetStatement> statements;
   for(size_t i = 0; i < lexer.tokens.size(); i++){
