@@ -12,15 +12,10 @@ int main(int argc, char**argv){
   Parser parser;
   Program program = parser.parse_tokens(lexer.tokens);
 
-
+  std::cout << "\n";
   for(const auto &i: program.statements){
-    std::cout << i->get_ident().data << " | "; 
-    for(const auto &j: i->expressions){
-      std::cout << j.data << " ";
-    };
-    std::cout << "\n";
+    std::cout << i->print_info();
   }
-      
 
   /*
   std::cout << "Monkeylang interpreter - in C++!\n";

@@ -41,6 +41,8 @@ struct token {
   std::string data;
 };
 
+
+
 std::ostream& operator<<(std::ostream& out, const token_type& val){
   std::string s;
 #define STR(p) case(p): s = #p; break;
