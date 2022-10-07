@@ -1,9 +1,10 @@
 #pragma once
-
+#include <utility>
 #include "lexer.hpp"
 #include <memory>
 #include <numeric>
 #define ReturnStatement Statement
+
 
 class Statement {
 public:
@@ -19,6 +20,8 @@ public:
     return state_tok.data + " " + sum_expr + ";\n";};
 };
 
+
+
 class LetStatement : public Statement {
 public:
   token ident;
@@ -32,10 +35,35 @@ public:
     return state_tok.data + " " + ident.data + " = " + sum_expr + ";\n";};
 };
 
+class ExpressionStatement : public Statement {
+public:
+  virtual std::string print_info() const {
+    std::string sum_expr;
+    for(const auto &i: expressions){
+      sum_expr += i.data;
+    }
+    
+    return sum_expr + " \n";
+  }
+};
+
+
+
+
 class Program {
 public:
-  std::vector<std::shared_ptr<Statement>> statements;
-  void add(std::shared_ptr<Statement> object) { statements.push_back(object); }
+  std::vector<std::unique_ptr<Statement>> statements;
+  void add(std::unique_ptr<Statement> object) { statements.emplace_back(std::move(object)); }
+};
+
+enum precedence {
+  LOWEST,
+  EQUALS, // ==
+  LESSGREATER, // > and <
+  SUM, // +
+  PRODUCT, // *
+  PREFIX, // -X or !X
+  CALL // function(x)
 };
 
 class Parser {
@@ -74,7 +102,7 @@ Program Parser::parse_tokens(const std::vector<token>& tokens){
       let.expressions.push_back(TOK(index));
     }
       
-    statements.add(std::make_shared<LetStatement>(let));
+    statements.add(std::make_unique<LetStatement>(let));
 
     return LET;
   };
@@ -94,11 +122,38 @@ Program Parser::parse_tokens(const std::vector<token>& tokens){
       ret.expressions.push_back(TOK(index));
     }
     
-    statements.add(std::make_shared<Statement>(ret));
+    statements.add(std::make_unique<Statement>(ret));
     return RETURN;
   };
 
-  
+  auto parse_expr = [&](precedence priority){
+    switch(TOKTYPE(index)){
+    case IDENT:{
+      return TOK(index);
+    }
+    default:{
+      token tok;
+      tok.type = ILLEGAL;
+      return tok;
+    }
+    }
+  };
+    
+
+  auto parse_expr_state = [&](){
+    ExpressionStatement expr_stat;
+    expr_stat.state_tok = TOK(index);
+
+    expr_stat.expressions.emplace_back(parse_expr(LOWEST));
+
+    if(TOKTYPE(index+1) == SEMICOLON){ index++; }
+
+    statements.add(std::make_unique<ExpressionStatement>(expr_stat));
+
+    return expr_stat;
+  };
+
+
 
   for(index = 0; index < tokens.size(); index++){
     switch(TOKTYPE(index)){
@@ -112,7 +167,7 @@ Program Parser::parse_tokens(const std::vector<token>& tokens){
       break;
     }
       
-    default: continue;
+    default: { parse_expr_state(); }
       
     }
   }

@@ -12,7 +12,7 @@ int main(int argc, char**argv){
   Parser parser;
   Program program = parser.parse_tokens(lexer.tokens);
 
-  std::cout << "\n";
+  
   for(const auto &i: program.statements){
     std::cout << i->print_info();
   }
