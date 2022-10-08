@@ -1,53 +1,64 @@
 #pragma once
-#include <utility>
+
 #include "lexer.hpp"
 #include <memory>
 #include <numeric>
-#define ReturnStatement Statement
 
-
-class Statement {
-public:
-  token state_tok;
-  std::vector<token> expressions;
-  virtual token get_ident() const { return state_tok; };
-  virtual std::string print_info() const {
-    std::string sum_expr;
-    for(const auto &i: expressions){
-      sum_expr += i.data;
-    }
-
-    return state_tok.data + " " + sum_expr + ";\n";};
+struct Node {
+  virtual token return_token() const { token tok; return tok;};
+  virtual std::string print_info() const { return " "; };
 };
 
 
+class Statement : public Node {
+  
+};
+
+class Expression : public Node {
+  
+};
+
+class Identifier : public Expression {
+public:  
+  token ident;
+  virtual token return_token() const { return ident; };
+  virtual std::string print_info() const { return ident.data; };
+};
+
+class IntegerIdentifier : public Expression {
+public:
+  token ident;
+  int val;
+  virtual token return_token() const { return ident; }
+  virtual std::string print_info() const { return ident.data; };
+};
 
 class LetStatement : public Statement {
 public:
+  token let;
   token ident;
-  virtual token get_ident()  const { return ident; };
-  virtual std::string print_info()  const {
-    std::string sum_expr;
-    for(const auto &i: expressions){
-      sum_expr += i.data;
-    }
-
-    return state_tok.data + " " + ident.data + " = " + sum_expr + ";\n";};
+  Expression value;
+  virtual token return_token()  const { return let; };
+  virtual std::string print_info() const { return let.data + " " + ident.data + " = ;\n"; };
+    
 };
 
+class ReturnStatement : public Statement {
+  public:
+  token ret_stat;
+  Expression value;
+  virtual token return_token() const { return ret_stat; };
+  virtual std::string print_info() const { return ret_stat.data + " ;\n"; };
+};
+    
 class ExpressionStatement : public Statement {
 public:
-  virtual std::string print_info() const {
-    std::string sum_expr;
-    for(const auto &i: expressions){
-      sum_expr += i.data;
-    }
-    
-    return sum_expr + " \n";
-  }
+  token first_tok;
+  std::shared_ptr<Expression> expression;
+  virtual token return_token() const { return first_tok; };
+  virtual std::string print_info() const { return expression->return_token().data + "\n"; };
+  //ExpressionStatement(token t, std::unique_ptr<Expression> expr)
 };
-
-
 
 
 class Program {
@@ -68,15 +79,43 @@ enum precedence {
 
 class Parser {
 public:
-  Program parse_tokens(const std::vector<token>& tokens);
+  std::unique_ptr<const std::vector<token>> tokens;
+  Program parse_tokens();
+  std::shared_ptr<Expression> parse_expression(const precedence& priority);
   size_t index;
+
+  Parser(const std::vector<token> lexer_output){
+    tokens = std::make_unique<const std::vector<token>>(lexer_output);
+  };
 };
 
-#define TOKTYPE(index) (tokens[index].type)
-#define TOK(index)  (tokens[index])
+#define TOKTYPE(index) (tokens->at(index).type)
+#define TOK(index)  (tokens->at(index))
 
-Program Parser::parse_tokens(const std::vector<token>& tokens){
+std::shared_ptr<Expression> Parser::parse_expression(const precedence& priority){
+  
+    switch(TOKTYPE(index)){
+    case IDENT:{
+      Identifier ident;
+      ident.ident = TOK(index);
+      return std::make_shared<Identifier>(ident);
+    }
+    case INT:{
+      IntegerIdentifier ident;
+      ident.ident = TOK(index);
+      ident.val = std::stoi(TOK(index).data);
+      return std::make_shared<IntegerIdentifier>(ident);
+    } 
+    default:{
+      Identifier ident;
+      assert(1 == 0);
+      return std::make_shared<Identifier>(ident);
+    }
+    }
+}
+Program Parser::parse_tokens(){
   Program statements;
+
 
   auto parse_let = [&](){
     if(TOKTYPE(index+1) != IDENT){
@@ -94,12 +133,12 @@ Program Parser::parse_tokens(const std::vector<token>& tokens){
       
     LetStatement let;
     let.ident = TOK(index+1);
-    let.state_tok = TOK(index);
+    let.let = TOK(index);
       
     index+=3;
       
     for(;TOKTYPE(index) != SEMICOLON; index++){
-      let.expressions.push_back(TOK(index));
+      //      let.expressions.push_back(TOK(index));
     }
       
     statements.add(std::make_unique<LetStatement>(let));
@@ -115,26 +154,35 @@ Program Parser::parse_tokens(const std::vector<token>& tokens){
     }
 
     ReturnStatement ret;
-    ret.state_tok = TOK(index);
+    ret.ret_stat = TOK(index);
     index++;
 
     for(;TOKTYPE(index) != SEMICOLON; index++){
-      ret.expressions.push_back(TOK(index));
+      //      ret.expressions.push_back(TOK(index));
     }
     
     statements.add(std::make_unique<Statement>(ret));
     return RETURN;
   };
-
-  auto parse_expr = [&](precedence priority){
+  
+  std::shared_ptr<Expression> parse_expr = [&](precedence priority){
     switch(TOKTYPE(index)){
     case IDENT:{
-      return TOK(index);
+      Identifier ident;
+      ident.ident = TOK(index);
+      return std::make_shared<Identifier>(ident);
     }
+    case INT:{
+      IntegerIdentifier ident;
+      ident.ident = TOK(index);
+      ident.val = std::stoi(TOK(index).data);
+      auto return_val = std::make_shared<IntegerIdentifier>(ident);
+      return return_val;
+    } 
     default:{
-      token tok;
-      tok.type = ILLEGAL;
-      return tok;
+      Identifier ident;
+      assert(1 == 0);
+      return std::make_shared<Identifier>(ident);
     }
     }
   };
@@ -142,20 +190,21 @@ Program Parser::parse_tokens(const std::vector<token>& tokens){
 
   auto parse_expr_state = [&](){
     ExpressionStatement expr_stat;
-    expr_stat.state_tok = TOK(index);
-
-    expr_stat.expressions.emplace_back(parse_expr(LOWEST));
+    expr_stat.first_tok = TOK(index);
+    
+    auto expr = parse_expr(LOWEST);
+    expr_stat.expression = expr;
 
     if(TOKTYPE(index+1) == SEMICOLON){ index++; }
 
-    statements.add(std::make_unique<ExpressionStatement>(expr_stat));
+    statements.statements.push_back(std::make_unique<ExpressionStatement>(expr_stat));
 
     return expr_stat;
   };
 
+  
 
-
-  for(index = 0; index < tokens.size(); index++){
+  for(index = 0; index < tokens->size(); index++){
     switch(TOKTYPE(index)){
     case LET:{
       parse_let();
@@ -168,7 +217,7 @@ Program Parser::parse_tokens(const std::vector<token>& tokens){
     }
       
     default: { parse_expr_state(); }
-      
+    }
     }
   }
   

@@ -9,13 +9,14 @@ int main(int argc, char**argv){
   Lexer lexer(argv[1]);
   lexer.read_in();
 
-  Parser parser;
-  Program program = parser.parse_tokens(lexer.tokens);
+  Parser parser(lexer.tokens);
+  Program program(parser.parse_tokens());
 
   
   for(const auto &i: program.statements){
     std::cout << i->print_info();
   }
+
 
   /*
   std::cout << "Monkeylang interpreter - in C++!\n";
