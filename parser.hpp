@@ -6,7 +6,7 @@
 
 struct Node {
   virtual token return_token() const { token tok; return tok;};
-  virtual std::string print_info() const { return " "; };
+  virtual std::string print_info() const { return "!!!!!!!"; };
 };
 
 
@@ -56,8 +56,15 @@ public:
   token first_tok;
   std::shared_ptr<Expression> expression;
   virtual token return_token() const { return first_tok; };
-  virtual std::string print_info() const { return expression->return_token().data + "\n"; };
-  //ExpressionStatement(token t, std::unique_ptr<Expression> expr)
+  virtual std::string print_info() const { return expression->print_info(); };
+};
+
+class PrefixExpression : public Expression {
+public:
+  token prefix;
+  std::shared_ptr<Expression> right;
+  virtual token return_token() const { return prefix; };
+  virtual std::string print_info() const { return "(" + prefix.data + right->print_info() + ")\n"; };
 };
 
 
@@ -81,7 +88,7 @@ class Parser {
 public:
   std::unique_ptr<const std::vector<token>> tokens;
   Program parse_tokens();
-  std::shared_ptr<Expression> parse_expression(const precedence& priority);
+  std::unique_ptr<Expression> parse_expression(const precedence& priority);
   size_t index;
 
   Parser(const std::vector<token> lexer_output){
@@ -92,27 +99,34 @@ public:
 #define TOKTYPE(index) (tokens->at(index).type)
 #define TOK(index)  (tokens->at(index))
 
-std::shared_ptr<Expression> Parser::parse_expression(const precedence& priority){
+std::unique_ptr<Expression> Parser::parse_expression(const precedence& priority){
   
-    switch(TOKTYPE(index)){
+  switch(TOKTYPE(index)){
     case IDENT:{
       Identifier ident;
       ident.ident = TOK(index);
-      return std::make_shared<Identifier>(ident);
+      return std::make_unique<Identifier>(ident);
     }
     case INT:{
       IntegerIdentifier ident;
       ident.ident = TOK(index);
       ident.val = std::stoi(TOK(index).data);
-      return std::make_shared<IntegerIdentifier>(ident);
-    } 
-    default:{
-      Identifier ident;
-      assert(1 == 0);
-      return std::make_shared<Identifier>(ident);
+      return std::make_unique<IntegerIdentifier>(ident);
     }
+    case BANG:
+    case MINUS: {
+      PrefixExpression pre;
+      pre.prefix = TOK(index);
+      index++;
+      pre.right = parse_expression(PREFIX);
+      return std::make_unique<PrefixExpression>(pre);
     }
+
+      
+    default:{ std::cout << "Parser FAIL\n"; return nullptr; }
+  }
 }
+
 Program Parser::parse_tokens(){
   Program statements;
 
@@ -165,39 +179,16 @@ Program Parser::parse_tokens(){
     return RETURN;
   };
   
-  std::shared_ptr<Expression> parse_expr = [&](precedence priority){
-    switch(TOKTYPE(index)){
-    case IDENT:{
-      Identifier ident;
-      ident.ident = TOK(index);
-      return std::make_shared<Identifier>(ident);
-    }
-    case INT:{
-      IntegerIdentifier ident;
-      ident.ident = TOK(index);
-      ident.val = std::stoi(TOK(index).data);
-      auto return_val = std::make_shared<IntegerIdentifier>(ident);
-      return return_val;
-    } 
-    default:{
-      Identifier ident;
-      assert(1 == 0);
-      return std::make_shared<Identifier>(ident);
-    }
-    }
-  };
-    
 
   auto parse_expr_state = [&](){
     ExpressionStatement expr_stat;
     expr_stat.first_tok = TOK(index);
     
-    auto expr = parse_expr(LOWEST);
-    expr_stat.expression = expr;
+    expr_stat.expression = parse_expression(LOWEST);
 
     if(TOKTYPE(index+1) == SEMICOLON){ index++; }
 
-    statements.statements.push_back(std::make_unique<ExpressionStatement>(expr_stat));
+    statements.add(std::make_unique<ExpressionStatement>(expr_stat));
 
     return expr_stat;
   };
@@ -216,8 +207,7 @@ Program Parser::parse_tokens(){
       break;
     }
       
-    default: { parse_expr_state(); }
-    }
+    default: { parse_expr_state();  }    
     }
   }
   

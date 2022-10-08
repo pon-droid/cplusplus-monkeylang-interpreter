@@ -15,9 +15,7 @@ int main(int argc, char**argv){
   
   for(const auto &i: program.statements){
     std::cout << i->print_info();
-  }
-
-
+  }  
   /*
   std::cout << "Monkeylang interpreter - in C++!\n";
   
