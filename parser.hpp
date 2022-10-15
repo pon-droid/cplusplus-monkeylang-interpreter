@@ -67,11 +67,18 @@ public:
   virtual std::string print_info() const { return "(" + prefix.data + right->print_info() + ")\n"; };
 };
 
+class InfixExpression : public Expression {
+public:
+  token infix_op;
+  std::shared_ptr<Expression> left, right;
+  virtual token return_token() const { return infix_op; };
+  virtual std::string print_info() const { return "(" + left->print_info() + " " + infix_op.data + " " + right->print_info() + ")\n"; };
+};
 
 class Program {
 public:
-  std::vector<std::unique_ptr<Statement>> statements;
-  void add(std::unique_ptr<Statement> object) { statements.emplace_back(std::move(object)); }
+  std::vector<std::shared_ptr<Statement>> statements;
+  void add(std::shared_ptr<Statement> object) { statements.emplace_back(std::move(object)); }
 };
 
 enum precedence {
@@ -88,8 +95,31 @@ class Parser {
 public:
   std::unique_ptr<const std::vector<token>> tokens;
   Program parse_tokens();
-  std::unique_ptr<Expression> parse_expression(const precedence& priority);
+  
+  std::shared_ptr<Expression> parse_prefix();
+  std::shared_ptr<Expression> parse_infix(std::shared_ptr<Expression> left);  
+  std::shared_ptr<Expression> parse_expression(const precedence& priority);
   size_t index;
+
+  std::unordered_map<token_type, precedence> precedences = {
+      {EQ, EQUALS},
+      {NOT_EQ, EQUALS},
+      {LT, LESSGREATER},
+      {GT, LESSGREATER},
+      {PLUS, SUM},
+      {MINUS, SUM},
+      {SLASH, PRODUCT},
+      {ASTERISK, PRODUCT}
+    };
+  bool in_map(const token_type& tok){
+    return precedences.count(tok) != 0;
+  };
+
+  precedence check_precedence(const token_type& tok){
+    if(in_map(tok)){
+      return precedences[tok];
+    } else { return LOWEST; }
+  };
 
   Parser(const std::vector<token> lexer_output){
     tokens = std::make_unique<const std::vector<token>>(lexer_output);
@@ -99,19 +129,45 @@ public:
 #define TOKTYPE(index) (tokens->at(index).type)
 #define TOK(index)  (tokens->at(index))
 
-std::unique_ptr<Expression> Parser::parse_expression(const precedence& priority){
+std::shared_ptr<Expression> Parser::parse_expression(const precedence& priority){
+  auto prefix = parse_prefix();
+  index++;
+  for( ; TOKTYPE(index) != SEMICOLON && priority < check_precedence(TOKTYPE(index));){
+    index++;
+    prefix = parse_infix(std::move(prefix));
+    std::cout << "work " << index << "\n";
+  }
+
+  return prefix;
+};
+
+std::shared_ptr<Expression> Parser::parse_infix(std::shared_ptr<Expression> left){
+  InfixExpression infix;
+  infix.infix_op = TOK(index);
+  infix.left = std::move(left);
+
+  if(in_map(TOKTYPE(index))){
+    auto priority = precedences[TOKTYPE(index)];
+    index++;
+    infix.left = parse_expression(priority);
+  }
+
+  return std::make_shared<InfixExpression>(infix);
+};
+
+std::shared_ptr<Expression> Parser::parse_prefix(){
   
   switch(TOKTYPE(index)){
     case IDENT:{
       Identifier ident;
       ident.ident = TOK(index);
-      return std::make_unique<Identifier>(ident);
+      return std::make_shared<Identifier>(ident);
     }
     case INT:{
       IntegerIdentifier ident;
       ident.ident = TOK(index);
       ident.val = std::stoi(TOK(index).data);
-      return std::make_unique<IntegerIdentifier>(ident);
+      return std::make_shared<IntegerIdentifier>(ident);
     }
     case BANG:
     case MINUS: {
@@ -119,7 +175,7 @@ std::unique_ptr<Expression> Parser::parse_expression(const precedence& priority)
       pre.prefix = TOK(index);
       index++;
       pre.right = parse_expression(PREFIX);
-      return std::make_unique<PrefixExpression>(pre);
+      return std::make_shared<PrefixExpression>(pre);
     }
 
       
@@ -155,7 +211,7 @@ Program Parser::parse_tokens(){
       //      let.expressions.push_back(TOK(index));
     }
       
-    statements.add(std::make_unique<LetStatement>(let));
+    statements.add(std::make_shared<LetStatement>(let));
 
     return LET;
   };
@@ -175,7 +231,7 @@ Program Parser::parse_tokens(){
       //      ret.expressions.push_back(TOK(index));
     }
     
-    statements.add(std::make_unique<Statement>(ret));
+    statements.add(std::make_shared<Statement>(ret));
     return RETURN;
   };
   
@@ -188,7 +244,7 @@ Program Parser::parse_tokens(){
 
     if(TOKTYPE(index+1) == SEMICOLON){ index++; }
 
-    statements.add(std::make_unique<ExpressionStatement>(expr_stat));
+    statements.add(std::make_shared<ExpressionStatement>(expr_stat));
 
     return expr_stat;
   };
